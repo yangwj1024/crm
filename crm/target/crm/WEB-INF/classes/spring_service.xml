@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop" 
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:jpa="http://www.springframework.org/schema/data/jpa" xmlns:task="http://www.springframework.org/schema/task"
+	xsi:schemaLocation="
+	   http://www.springframework.org/schema/beans 
+	   http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+	   http://www.springframework.org/schema/context 
+	   http://www.springframework.org/schema/context/spring-context-3.2.xsd
+	   http://www.springframework.org/schema/aop 
+	   http://www.springframework.org/schema/aop/spring-aop-3.2.xsd
+	   http://www.springframework.org/schema/tx
+	   http://www.springframework.org/schema/tx/spring-tx-3.2.xsd
+	   http://www.springframework.org/schema/data/jpa
+	   http://www.springframework.org/schema/data/jpa/spring-jpa.xsd">
+
+	<!-- 扫描添加了spring注解的类 -->
+	<context:component-scan base-package="com.ywj.crm.service" />
+	<context:property-placeholder location="classpath:db.properties"/>
+	<!-- 配置数据源 -->
+	<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+		<property name="user" value="${dataSource.username}"></property>
+		<property name="password" value="${dataSource.password}"></property>
+		<property name="jdbcUrl" value="${dataSource.url}" ></property>
+		<property name="driverClass" value="${dataSource.driverClassName}"></property>
+	</bean>
+
+	<!-- 创建entityManagerFactory对象交给spring容器管理-->
+	<bean id="entityManagerFactoty" class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<!--配置的扫描的包（实体类所在的包） -->
+		<property name="packagesToScan" value="com.ywj.crm.bean" />
+		<!-- jpa的实现厂家 -->
+		<property name="persistenceProvider">
+			<bean class="org.hibernate.jpa.HibernatePersistenceProvider"/>
+		</property>
+		<!--jpa的供应商适配器 -->
+		<property name="jpaVendorAdapter">
+			<bean class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter">
+				<!--配置是否自动创建数据库表 -->
+				<property name="generateDdl" value="false" />
+				<!--指定数据库类型 -->
+				<property name="database" value="MYSQL" />
+				<!--数据库方言：支持的特有语法 -->
+				<property name="databasePlatform" value="org.hibernate.dialect.MySQLDialect" />
+				<!--是否显示sql -->
+				<property name="showSql" value="true" />
+			</bean>
+		</property>
+		<!--jpa的方言 ：高级的特性 -->
+		<property name="jpaDialect" >
+			<bean class="org.springframework.orm.jpa.vendor.HibernateJpaDialect" />
+		</property>
+	</bean>
+
+	<!-- 配置事务管理器 -->
+	<bean id="transactionManager"
+		  class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<!--与事务有关，需要用到connection对象，所以需要配置数据源-->
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!--整合spring dataJpa-->
+	<jpa:repositories base-package="com.ywj.crm.dao" transaction-manager-ref="transactionManager"
+					  entity-manager-factory-ref="entityManagerFactoty" ></jpa:repositories>
+
+
+
+	<!-- 配置事务拦截器  通知 -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<!-- 注入事务属性 -->
+		<tx:attributes>
+			<tx:method name="get*" read-only="true" />
+			<tx:method name="find*" read-only="true" />
+			<!-- propagation="REQUIRED" rollback-for="Exception" 配置事务 -->
+			<tx:method name="*" propagation="REQUIRED" rollback-for="Exception" />
+		</tx:attributes>
+	</tx:advice>
+
+	<!-- spring的aop配置 -->
+	<aop:config proxy-target-class="true">
+		<aop:pointcut id="txPointcut"
+			expression="execution(* com.ywj.crm.service.*.*(..)) " />
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="txPointcut" />
+	</aop:config>
+
+</beans>
